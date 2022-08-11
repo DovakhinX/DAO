@@ -1,3 +1,4 @@
+
 // We require the Hardhat Runtime Environment explicitly here. This is optional
 // but useful for running the script in a standalone fashion through `node <script>`.
 //
@@ -5,8 +6,18 @@
 // will compile your contracts, add the Hardhat Runtime Environment's members to the
 // global scope, and execute the script.
 
-const { ethers } = require("hardhat");
 const hre = require("hardhat");
+
+
+async function skipTime(amount){
+  for(let i=0;i<amount;i++){
+    await hre.network.provider.request({
+      method:"evm_mine",
+      params: [],
+    });
+  }
+  console.log("I am speed...")
+}
 
 async function main() {
   const VoteToken = await hre.ethers.getContractFactory("VoteToken");
@@ -52,8 +63,8 @@ async function main() {
  const proposerRole=await timelock.PROPOSER_ROLE();
  const executorRole=await timelock.EXECUTOR_ROLE();
 
- const grantRole=await timelock.grantRole(proposerRole,mygovernor.address,{from:executor.address});
- const grantRole2=await timelock.grantRole(executorRole,mygovernor.address,{from:executor.address}); 
+ const grantRole=await timelock.connect(executor).grantRole(proposerRole,mygovernor.address);
+ const grantRole2=await timelock.connect(executor).grantRole(executorRole,mygovernor.address); 
  console.log("Proposer and Executor role granted.")
 
  //Token delegation
@@ -96,21 +107,48 @@ console.log(`Current block number :${blockNumber}`);
 
 // Voting process
 
-const voteA=await mygovernor.connect(voterA).castVote(id,10);
+const voteA=await mygovernor.connect(voterA).castVote(id,1);
 const voteB=await mygovernor.connect(voterB).castVote(id,1);
 const voteC=await mygovernor.connect(voterC).castVote(id,1);
 const voteD=await mygovernor.connect(voterD).castVote(id,1);
 const voteE=await mygovernor.connect(voterE).castVote(id,0);
+console.log("Voting done..")
 
-/*const proposalState2 = await mygovernor.state(id);
+const proposalState2 = await mygovernor.state(id);
 console.log(`Current state of proposal: ${proposalState2.toString()} `);
 
 
 
 const blockNumber2=await provider.getBlockNumber();
-console.log(`Current block number :${blockNumber2}`);*/
+console.log(`Current block number :${blockNumber2}`);
 
+//Vote count display
+const { againstVotes, forVotes, abstainVotes } = await mygovernor.proposalVotes(id);
+    console.log(`Votes For: ${forVotes.toString()}`)
+    console.log(`Votes Against: ${againstVotes.toString()}`)
+    console.log(`Votes Neutral: ${abstainVotes.toString()}`)
 
+  
+//Time skipper
+await skipTime(14+1);
+const proposalState3 = await mygovernor.state(id);
+console.log(`Current state of proposal: ${proposalState3.toString()} `);
+//queue process
+const descriptionHash=hre.ethers.utils.id(("Fund Release from Treasury"));
+const que=await mygovernor.connect(executor).queue([treasury.address],[0],[encodedFunction],descriptionHash);
+console.log("Proposal is queued for execution");
+//execute the proposal
+const executing=await mygovernor.connect(executor).execute([treasury.address],[0],[encodedFunction],descriptionHash);
+console.log("Proposal executed");
+// Final check
+const proposalState4 = await mygovernor.state(id);
+console.log(`Current state of proposal: ${proposalState4.toString()} `);
+
+let fundStatus2=await treasury.isReleased();
+console.log(`Fund Status: ${fundStatus2}`);
+
+let funds2=await provider.getBalance(treasury.address);
+console.log(`Treasury fund ${hre.ethers.utils.formatEther(funds2)}`);
 }
 
 
